@@ -1,0 +1,7 @@
+*Zone.Identifier
+data/
+build/
+test/
+
+.md
+!README.md

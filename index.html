@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>Question Editor</title>
+		<script type="text/javascript" src="scripts/f.js"></script>
+		<script type="text/javascript" src="scripts/j.js"></script>
+		<script type="text/javascript" src="scripts/z.js"></script>
+		<script type="text/javascript" src="scripts/s.js"></script>
+		<script type="module" src="scripts/p.mjs"></script>
+		<script type="text/javascript">
+			const module = {};
+			let subTags = [];
+
+			let pageData = {
+				subject: "",
+				tags: [],
+				year: "",
+				lang: "na",
+				paper: "",
+				section: "",
+				question: 0,
+				q_file: "",
+				q_caps: [],
+				a_file: "",
+				a_caps: [],
+				videos: [],
+				a_md: ""
+			};
+
+			const _pullTagFrom = (u, f) => {
+				$.ajax({
+					url: u,
+					dataType: "text",
+					method: "GET",
+					processData: false
+				})
+					.done((d) => {
+						const arr = String(d).split(/[\r\n]+/);
+						if (arr && arr.length > 0) {
+							subTags = arr;
+							return;
+						}
+						if (typeof f === "function") f();
+					})
+					.fail(() => {
+						if (typeof f === "function") f();
+					});
+			};
+
+			const pullTags = () => {
+				const base =
+					"https://raw.githubusercontent.com/dse-life-data/pastpaper.x/refs/heads/main/";
+				const p1 = base + `${pageData.subject}/${pageData.lang}/by-tag/all.txt`;
+				const p2 = base + `${pageData.subject}/na/by-tag/all.txt`;
+				_pullTagFrom(p1, () => {
+					if (p1 != p2) _pullTagFrom(p2);
+				});
+			};
+
+			const mixTags = () => {
+				const na = [...new Set([...subTags, ...pageData.tags])];
+				na.sort();
+				return na;
+			};
+
+			const saveZipData = () => {
+				if (!pageData.subject) {
+					alert("subject required!");
+					return;
+				}
+				if (!pageData.year) {
+					alert("year required!");
+					return;
+				}
+				if (!pageData.lang) {
+					alert("lang required! (select n/a if only have one language)");
+					return;
+				}
+				if (!pageData.paper) {
+					alert("paper required!");
+					return;
+				}
+				if (!pageData.q_file || !pageData.q_caps) {
+					alert("question capture required!");
+					return;
+				}
+
+				const dat = JSON.stringify(pageData);
+
+				const filePrefix = `y${pageData.year}-l${pageData.lang}-p${pageData.paper}-s${pageData.section}-q${pageData.question}`;
+				const coreFile = `${pageData.subject}/${pageData.lang}/qa/${filePrefix}.json`;
+
+				const z = new JSZip();
+				const folder = z.folder(pageData.subject).folder(pageData.lang);
+				const byPS = folder.folder(
+					`by-paper-section/p${pageData.paper}/s${pageData.section}`
+				);
+				byPS.file(`${filePrefix}.txt`, coreFile);
+
+				const byTag = folder.folder("by-tag");
+				for (let i = 0; i < pageData.tags.length; i++) {
+					const t = pageData.tags[i];
+					byTag.file(`${t}/${filePrefix}.txt`, coreFile);
+				}
+
+				byTag.file("all.txt", mixTags().join("\r\n"));
+
+				folder.file(`by-year/${pageData.year}/${filePrefix}.txt`, coreFile);
+
+				z.file(coreFile, dat);
+
+				z.generateAsync({ type: "blob" }, function updateCallback(metadata) {
+					console.log("zip progression : ", metadata.percent.toFixed(2), "%");
+				}).then((b) => {
+					saveAs(b, `${filePrefix}.zip`);
+				});
+			};
+
+			let currentImage = null;
+
+			let vCanvas = null;
+			let sd = {
+				p: 1,
+				r: 0,
+				x: 0,
+				y: 0,
+				w: 100,
+				h: 50,
+				mw: 200,
+				mh: 300
+			};
+
+			const previewData = () => {
+				$("#data-summary").text(JSON.stringify(pageData));
+			};
+
+			const drawTags = () => {
+				let h = "";
+				for (let i = 0; i < pageData.tags.length; i++) {
+					console.log(pageData.tags[i]);
+					h += `<span id="tag-${i}"> ${pageData.tags[i]} &nbsp; <button onclick="removeTag(${i})">X</button></span>`;
+				}
+				$("#tags-holder").html(h);
+				previewData();
+			};
+
+			const removeTag = (pos) => {
+				pageData.tags.splice(pos, 1);
+				drawTags();
+			};
+
+			const addTag = (inputBox) => {
+				const v = inputBox.value;
+				pageData.tags[pageData.tags.length] = v;
+				inputBox.value = "";
+				drawTags();
+			};
+
+			_busy = () => {
+				$("main").attr("aria-busy");
+			};
+
+			_free = () => {
+				$("main").removeAttr("aria-busy");
+			};
+
+			const baseData =
+				"https://raw.githubusercontent.com/dse-life-data/pastpaper.x/refs/heads/main/base/data.json";
+			let data = {};
+			let source = null;
+
+			const selectSource = (e) => {
+				const v = $(e).val();
+			};
+			const clearSelection = () => {
+				const b = $("#question-selection>option:nth-child(1)").html();
+				$("#question-selection").empty().append(b);
+
+				const u = $("#answer-selection>option:nth-child(1)").html();
+				$("#answer-selection").empty().append(u);
+			};
+			const selectSubject = (e) => {
+				const v = $(e).val();
+				pageData.subject = v;
+
+				const files = data.files[v];
+				if (!Array.isArray(files)) {
+					console.log("no data", files, v);
+				}
+				clearSelection();
+				files.forEach((ele) => {
+					const opt = `<option value="${ele}">${ele}</option>`;
+					$("#question-selection").append(opt);
+					$("#answer-selection").append(opt);
+				});
+				previewData();
+			};
+
+			const loadPdfFile = (url) => {
+				module.canopenner.openUrl(url);
+			};
+
+			const selectAnswer = (e) => {
+				$("main").removeClass("mode_question");
+				$("main").addClass("mode_answer");
+
+				$("#detail-question-preview").removeAttr("open");
+				$("#detail-answer-preview").attr("open");
+
+				const v = String($(e).val());
+
+				const url = source + v;
+				loadPdfFile(url);
+				pageData.a_file = v;
+				pageData.a_caps = [];
+				$("#preview-answer-holder").empty();
+				previewData();
+			};
+			const selectQuestion = (e) => {
+				$("main").removeClass("mode_answer");
+				$("main").addClass("mode_question");
+
+				$("#detail-question-preview").attr("open");
+				$("#detail-answer-preview").removeAttr("open");
+
+				const v = String($(e).val());
+				const url = source + v;
+				loadPdfFile(url);
+
+				pageData.q_file = v;
+				pageData.q_caps = [];
+				$("#preview-question-holder").empty();
+
+				const yearPos = v.search(/\d{4}/);
+				if (yearPos) {
+					const yr = v.substr(yearPos, 4);
+					$("#q-year").val(yr);
+					pageData.year = yr;
+				} else {
+					$("#q-year").val("");
+				}
+				const langPos = v.search(/(chi|eng)/);
+				$("#q-lang>option").removeAttr("selected");
+				if (langPos) {
+					const lang = v.substr(langPos, 3);
+					if (lang === "chi") {
+						$("#q-lang-chi").attr("selected", "selected");
+						pageData.lang = "chi";
+					} else if (lang === "eng") {
+						$("#q-lang-eng").attr("selected", "selected");
+						pageData.lang = "eng";
+					}
+				}
+				const paper = v.match(/p([^\.]+)\.pdf/);
+				if (paper) {
+					const p = paper[1].toUpperCase();
+					$("#q-paper").val(p);
+					pageData.paper = p;
+				}
+				previewData();
+
+				pullTags();
+			};
+			const pageInit = () => {
+				if (!data.sources) return;
+
+				for (const key in data.sources) {
+					if (source === null) {
+						source = data.sources[key];
+					}
+					$("#source-selection").append(
+						`<option value="${key}">${key}</option>`
+					);
+				}
+				$("#source-selection>option:nth-child(2)").attr("selected", "selected");
+				for (const key in data.sname) {
+					$("#subject-selection").append(
+						`<option value="${key}">${data.sname[key]}</option>`
+					);
+				}
+				$("#subject-selection>option:nth-child(2)").attr(
+					"selected",
+					"selected"
+				);
+				$("#subject-selection").change();
+			};
+		</script>
+		<script type="module">
+			let scale = 1.0;
+			let eCanvas = null,
+				eCtx = null,
+				canvas = null,
+				ctx = null,
+				pdfDoc = null,
+				pageRendering = false,
+				pageNumPending = null;
+
+			const initPdfCanvas = () => {
+				if (!canvas) {
+					canvas = document.getElementById("the-canvas");
+					ctx = canvas.getContext("2d");
+				} else {
+					ctx = canvas.getContext("2d");
+					ctx.clearRect(0, 0, canvas.width, canvas.height);
+				}
+			};
+
+			function voidImage() {
+				if (currentImage && currentImage.src) currentImage.src = null; // may be not needed
+				currentImage = null;
+			}
+
+			function initEditCanvas() {
+				if (!eCanvas) {
+					eCanvas = document.getElementById("edit-canvas");
+					eCtx = eCanvas.getContext("2d");
+				} else {
+					eCtx = eCanvas.getContext("2d");
+					eCtx.clearRect(0, 0, eCanvas.width, eCanvas.height);
+				}
+			}
+			// PDF
+			let _drawing = false;
+			let _drawPending = false;
+
+			function redrawPage() {
+				if (!currentImage) return;
+
+				if (_drawing) {
+					_drawPending = true;
+					return;
+				}
+				_drawing = true;
+
+				initEditCanvas();
+				eCtx.canvas.width = sd.w;
+				eCtx.canvas.height = sd.h;
+
+				// const img = new Image();
+				// img.onload = () => {
+				eCtx.translate(sd.w / 2, sd.h / 2);
+				const angleInRadians = (sd.r * Math.PI) / 180;
+				eCtx.rotate(angleInRadians);
+				eCtx.drawImage(currentImage, -sd.x - sd.w / 2, -sd.y - sd.h / 2);
+				eCtx.restore();
+				_drawing = false;
+				if (_drawPending) {
+					_drawPending = false;
+					redrawPage();
+				}
+				// }
+				// canvas.toBlob((b)=>{
+				// 	img.src = URL.createObjectURL(b);
+				// })
+			}
+
+			function _syncSd() {
+				const x = document.getElementById("adj-x");
+				x.value = sd.x;
+				x.min = 0;
+				x.max = sd.w;
+
+				const y = document.getElementById("adj-y");
+				y.value = sd.y;
+				y.min = 0;
+				y.max = sd.h;
+
+				const w = document.getElementById("adj-w");
+				w.value = sd.w;
+				w.min = 0;
+				w.max = sd.w;
+
+				const h = document.getElementById("adj-h");
+				h.value = sd.h;
+				h.min = 0;
+				h.max = sd.h;
+
+				const r = document.getElementById("adj-r");
+				r.value = sd.r;
+			}
+			function resetCropData(d) {
+				sd = {
+					p: 1,
+					r: 0,
+					x: 0,
+					y: 0,
+					w: 100,
+					h: 50,
+					mw: 200,
+					mh: 300
+				};
+				if (d) {
+					sd = { ...sd, ...d };
+				}
+			}
+
+			function remove_a_cap(count) {
+				const pos = count - 1;
+				if (pos < 0) return;
+				if (pageData.a_caps.length > pos + 1) return;
+
+				pageData.a_caps.splice(pos, 1);
+				const target = document.getElementById(`ap-${count}`);
+				target.parentElement.removeChild(target);
+
+				previewData();
+			}
+
+			function cropAnswer() {
+				pageData.a_caps[pageData.a_caps.length] = sd;
+				const count = pageData.a_caps.length;
+				const canvas_id = `ap-${count}`;
+
+				$("#detail-answer-preview").attr("open", true);
+				$("#preview-answer-holder").append(
+					`<canvas id="${canvas_id}"><canvas>`
+				);
+
+				const tmpCanvas = document.getElementById(canvas_id);
+				tmpCanvas.onclick = () => {
+					remove_a_cap(count);
+				};
+				tmpCanvas.width = sd.w;
+				tmpCanvas.height = sd.h;
+
+				const tCtx = tmpCanvas.getContext("2d");
+				tCtx.canvas.width = sd.w;
+				tCtx.canvas.height = sd.h;
+
+				tCtx.translate(sd.w / 2, sd.h / 2);
+				const angleInRadians = (sd.r * Math.PI) / 180;
+				tCtx.rotate(angleInRadians);
+				tCtx.drawImage(currentImage, -sd.x - sd.w / 2, -sd.y - sd.h / 2);
+				tCtx.restore();
+
+				resetCropData({
+					p: sd.p,
+					mw: sd.mw,
+					mh: sd.mh,
+					w: sd.mw,
+					h: sd.mh
+				});
+				redrawPage();
+
+				previewData();
+			}
+
+			function remove_q_cap(count) {
+				const pos = count - 1;
+				if (pos < 0) return;
+				if (pageData.q_caps.length > pos + 1) return;
+
+				pageData.q_caps.splice(pos, 1);
+				const target = document.getElementById(`qp-${count}`);
+				target.parentElement.removeChild(target);
+
+				previewData();
+			}
+
+			function cropQuestion() {
+				pageData.q_caps[pageData.q_caps.length] = sd;
+
+				const count = pageData.q_caps.length;
+
+				const canvas_id = `qp-${count}`;
+
+				$("#detail-question-preview").attr("open", true);
+				$("#preview-question-holder").append(
+					`<canvas id="${canvas_id}"><canvas>`
+				);
+
+				const tmpCanvas = document.getElementById(canvas_id);
+				tmpCanvas.onclick = () => {
+					remove_q_cap(count);
+				};
+				tmpCanvas.width = sd.w;
+				tmpCanvas.height = sd.h;
+
+				const tCtx = tmpCanvas.getContext("2d");
+				tCtx.canvas.width = sd.w;
+				tCtx.canvas.height = sd.h;
+
+				tCtx.translate(sd.w / 2, sd.h / 2);
+				const angleInRadians = (sd.r * Math.PI) / 180;
+				tCtx.rotate(angleInRadians);
+				tCtx.drawImage(currentImage, -sd.x - sd.w / 2, -sd.y - sd.h / 2);
+				tCtx.restore();
+
+				resetCropData({
+					p: sd.p,
+					mw: sd.mw,
+					mh: sd.mh,
+					w: sd.mw,
+					h: sd.mh
+				});
+				redrawPage();
+
+				previewData();
+			}
+
+			let { pdfjsLib } = globalThis;
+			pdfjsLib.GlobalWorkerOptions.workerSrc = "scripts/p.w.mjs";
+
+			const renderPage = (num) => {
+				if (!pdfDoc) {
+					console.error("Pdf Doc not ready");
+					return;
+				}
+				if (pageRendering) {
+					console.log("no double rendering, please wait");
+					return;
+				}
+				pageRendering = true;
+				initPdfCanvas();
+
+				_busy();
+
+				pdfDoc.getPage(num).then(function (page) {
+					//   console.log(page);
+					$(canvas).show();
+					let viewport = page.getViewport({ scale: scale });
+					resetCropData({ p: num });
+
+					sd.mw = viewport.width;
+					sd.mh = viewport.height;
+
+					sd.w = sd.mw;
+					sd.h = sd.mh;
+
+					canvas.width = sd.mw;
+					canvas.height = sd.mh;
+
+					sd.x = 0;
+					sd.y = 0;
+
+					_syncSd();
+
+					// Render PDF page into canvas context
+					let renderContext = {
+						canvasContext: ctx,
+						viewport: viewport
+					};
+
+					let renderTask = page.render(renderContext);
+					// Wait for rendering to finish
+					renderTask.promise.then(function () {
+						pageRendering = false;
+
+						const img = new Image();
+						img.onload = () => {
+							voidImage();
+							currentImage = img;
+
+							_free();
+
+							$(canvas).hide();
+
+							document.getElementById("page_num").textContent = num;
+
+							pageRendering = false;
+
+							if (
+								pageNumPending !== null &&
+								pageNumPending > 0 &&
+								pageNumPending <= pdfDoc.numPages
+							) {
+								// New page rendering is pending
+								renderPage(pageNumPending);
+								pageNumPending = null;
+							} else {
+								// no more pending
+
+								redrawPage();
+							}
+						};
+						canvas.toBlob((b) => {
+							img.src = URL.createObjectURL(b);
+						});
+					});
+				});
+			};
+
+			let queueRenderPage = (num) => {
+				if (pageRendering) {
+					pageNumPending = num;
+				} else {
+					renderPage(num);
+				}
+			};
+			function onPrevPage() {
+				if (sd.p <= 1) {
+					return;
+				}
+				sd.p--;
+				queueRenderPage(sd.p);
+			}
+
+			function onNextPage() {
+				if (sd.p >= pdfDoc.numPages) {
+					return;
+				}
+				sd.p++;
+				queueRenderPage(sd.p);
+			}
+
+			let _buttonsInitFlag = false;
+
+			const buttonsInit = () => {
+				document.getElementById("q-lang").addEventListener("input", (event) => {
+					pageData.lang = event.target.value;
+					previewData();
+				});
+				document.getElementById("q-year").addEventListener("input", (event) => {
+					pageData.year = event.target.value;
+					previewData();
+				});
+				document
+					.getElementById("q-paper")
+					.addEventListener("input", (event) => {
+						pageData.paper = event.target.value;
+						previewData();
+					});
+				document
+					.getElementById("q-section")
+					.addEventListener("input", (event) => {
+						event.target.value = event.target.value.toUpperCase();
+						pageData.section = event.target.value;
+						previewData();
+					});
+				document
+					.getElementById("q-number")
+					.addEventListener("input", (event) => {
+						pageData.question = event.target.value;
+						previewData();
+					});
+				document.getElementById("adj-x").addEventListener("input", (event) => {
+					sd.x = event.target.value;
+					redrawPage();
+				});
+				document.getElementById("adj-y").addEventListener("input", (event) => {
+					sd.y = event.target.value;
+					redrawPage();
+				});
+				document.getElementById("adj-w").addEventListener("input", (event) => {
+					sd.w = event.target.value;
+					redrawPage();
+				});
+				document.getElementById("adj-h").addEventListener("input", (event) => {
+					sd.h = event.target.value;
+					redrawPage();
+				});
+				document.getElementById("adj-r").addEventListener("input", (event) => {
+					sd.r = event.target.value;
+					redrawPage();
+				});
+
+				const autocompleteInput = document.getElementById("tag-input");
+				const autocompleteResults = document.getElementById(
+					"tag-input-autocomplete"
+				);
+				autocompleteInput.addEventListener("input", (e) => {
+					const cv = String(e.target.value).toLowerCase();
+					autocompleteResults.innerHTML = "";
+					if (cv.length > 0 && subTags && subTags.length > 0) {
+						const fr = subTags.filter((item) =>
+							item.toLowerCase().startsWith(cv)
+						);
+						if (fr.length > 0) {
+							fr.forEach((item) => {
+								const listItem = document.createElement("li");
+								listItem.textContent = item;
+								autocompleteResults.appendChild(listItem);
+							});
+						}
+					}
+				});
+				autocompleteResults.addEventListener("click", function (event) {
+					if (event.target.tagName === "LI") {
+						autocompleteInput.value = event.target.textContent;
+						autocompleteResults.innerHTML = "";
+					}
+				});
+			};
+
+			module.canopenner = {
+				init: () => {
+					if (!_buttonsInitFlag) {
+						buttonsInit();
+						_buttonsInitFlag = true;
+					}
+					document.getElementById("prev").addEventListener("click", onPrevPage);
+					document.getElementById("next").addEventListener("click", onNextPage);
+					document
+						.getElementById("crop-it")
+						.addEventListener("click", cropQuestion);
+					document
+						.getElementById("crop-ans")
+						.addEventListener("click", cropAnswer);
+				},
+				openUrl: (u) => {
+					_busy();
+
+					let loadingTask = pdfjsLib.getDocument({ url: u });
+
+					loadingTask.promise.then(
+						function (pdf) {
+							pdfDoc = pdf;
+							$("#page_count").text(pdfDoc.numPages);
+							queueRenderPage(1);
+							$("#pdf-info").show();
+						},
+						function (reason) {
+							// PDF loading error
+							console.error("load error", reason);
+						}
+					);
+				}
+			};
+			console.log("loaded ", module);
+		</script>
+		<script>
+			window.onload = () => {
+				$.getJSON(baseData, (d) => {
+					data = d;
+					module.canopenner.init();
+					pageInit();
+					_free();
+				});
+			};
+		</script>
+		<link rel="stylesheet" href="css/pico.min.css" />
+		<link rel="stylesheet" href="css/pico.classless.min.css" />
+		<style>
+			body {
+				min-height: 100vh;
+				margin: 0;
+				position: absolute;
+			}
+
+			header {
+				min-height: 80px;
+				max-height: 100px;
+			}
+
+			footer {
+				min-height: 10px;
+				max-height: 70px;
+			}
+
+			body {
+				display: flex;
+				flex-direction: column;
+			}
+			main {
+				flex: 1;
+				overflow: auto;
+				max-height: calc(100vh - 180px);
+			}
+			[aria-busy] button {
+				display: none;
+			}
+			.target_mode {
+				display: none;
+			}
+			.mode_question .target_mode.question {
+				display: inline;
+			}
+			#crop-it {
+				display: none;
+			}
+			.mode_question #crop-it {
+				display: inline;
+			}
+			#crop-ans {
+				display: none;
+			}
+			.mode_answer #crop-ans {
+				display: inline;
+			}
+			.mode_answer .target_mode.answer {
+				display: inline;
+			}
+			#tag-input-autocomplete {
+				position: absolute;
+				z-index: 1;
+				margin-top: 40px;
+				margin-left: 10px;
+				padding-right: 30px;
+				background-color: darkslategray;
+			}
+		</style>
+	</head>
+	<body>
+		<header>
+			<div class="grid">
+				<div>
+					<label>
+						Source
+						<select
+							id="source-selection"
+							onchange="selectSource(this)"
+							aria-label="Select your data source..."
+						>
+							<option selected disabled value="">
+								Select your data source...
+							</option>
+						</select>
+					</label>
+				</div>
+				<div>
+					<lable>
+						Subject
+						<select
+							id="subject-selection"
+							onchange="selectSubject(this)"
+							aria-label="Select subject..."
+						>
+							<option selected disabled value=""> Select subject... </option>
+						</select>
+					</lable>
+				</div>
+			</div>
+		</header>
+		<main aria-busy="true" class="">
+			<div class="grid">
+				<div>
+					<lable>
+						Question File
+						<select
+							id="question-selection"
+							onchange="selectQuestion(this)"
+							aria-label="Select question..."
+						>
+							<option selected disabled value=""> Select question... </option>
+						</select>
+					</lable></div
+				><div>
+					<lable>
+						Answer File
+						<select
+							id="answer-selection"
+							onchange="selectAnswer(this)"
+							aria-label="Select answer..."
+						>
+							<option selected disabled value=""> Select answer... </option>
+						</select>
+					</lable>
+				</div>
+			</div>
+
+			<div class="grid">
+				<div>
+					<input
+						title="Year"
+						id="q-year"
+						type="text"
+						alt="Year"
+						placeholder="Year"
+					/> </div
+				><div>
+					<select name="q-lang" id="q-lang">
+						<option id="q-lang-na" value="">N/A</option>
+						<option id="q-lang-chi" value="chi">中文</option>
+						<option id="q-lang-eng" value="eng">Eng</option>
+					</select></div
+				><div>
+					<input
+						title="Paper"
+						id="q-paper"
+						type="text"
+						alt="Paper"
+						placeholder="Paper"
+					/> </div
+				><div>
+					<input
+						title="Section"
+						id="q-section"
+						type="text"
+						alt="Section"
+						placeholder="Section"
+					/> </div
+				><div>
+					<input
+						title="Question#"
+						id="q-number"
+						type="text"
+						alt="Question#"
+						placeholder="Question#"
+					/>
+				</div>
+			</div>
+			<details id="detail-tags" open>
+				<summary role="button" class="">Tags</summary>
+				<div id="tags-current">
+					<div style="display: flex; flex-direction: row">
+						<ul id="tag-input-autocomplete"></ul>
+						<input
+							style="flex: 5; margin-right: 10px"
+							title="Tag"
+							alt="Tag"
+							placeholder="Tag (always reuse existing tag, if any)"
+							id="tag-input"
+						/>
+						<button
+							style="flex: 1"
+							type="button"
+							onclick="addTag(document.getElementById('tag-input'))"
+							>Add</button
+						>
+					</div>
+					<div id="tags-holder"></div>
+				</div>
+			</details>
+			<details id="detail-question-preview">
+				<summary role="button" class="">Qusetion Preview</summary>
+				<div id="preview-question-holder"> no question yet </div>
+			</details>
+
+			<details id="detail-answer-preview">
+				<summary role="button" class="">Answer Preview</summary>
+				<div id="preview-answer-holder"> no answer yet </div>
+			</details>
+
+			<details id="detail-video">
+				<summary role="button" class="secondary">Youtube / Video links</summary>
+				<div id="preview-video-holder"> no videos yet </div>
+			</details>
+
+			<details id="detail-markdown">
+				<summary role="button" class="secondary">Answer (Markdown)</summary>
+				<textarea id="a-markdown-text"></textarea>
+			</details>
+			<div class="grid">
+				<div>
+					Mode:
+					<span class="target_mode question" id="target_mode_question">
+						Question
+					</span>
+					<span class="target_mode answer" id="target_mode_answer">
+						Answer
+					</span>
+					<br />
+					<span id="page_num">0</span> / <span id="page_count">0</span>
+				</div>
+				<button type="button" id="crop-it">Crop Q</button>
+				<button type="button" id="crop-ans">Crop A</button>
+			</div>
+			<div style="display: flex; flex-direction: row">
+				<div style="flex: 8">
+					<canvas id="the-canvas"></canvas>
+					<canvas id="edit-canvas"></canvas>
+				</div>
+				<div style="flex: 1">
+					<button type="button" id="prev">Prev P</button>
+					<button type="button" id="next">Next P</button>
+					<label>
+						Left
+						<input type="range" id="adj-x" step="1" />
+					</label>
+					<label>
+						Width
+						<input type="range" id="adj-w" step="1" />
+					</label>
+					<label>
+						Top
+						<input type="range" id="adj-y" step="1" />
+					</label>
+					<label>
+						Height
+						<input type="range" id="adj-h" step="1" />
+					</label>
+					<label>
+						Rotate
+						<input type="range" id="adj-r" step="0.1" min="-5" max="5" />
+					</label>
+				</div>
+			</div>
+		</main>
+		<footer>
+			<div style="display: flex; flex-direction: row">
+				<div style="flex: 1" id="data-summary"> </div>
+				<button type="button" onclick="saveZipData()"> Save </button>
+			</div>
+		</footer>
+	</body>
+</html>
