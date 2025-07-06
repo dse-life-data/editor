@@ -29,17 +29,17 @@
 
 			const syncVideoKeyword = () => {
 				let kw = `DSE ${pageData.subject} ${pageData.year}`;
-				if(pageData.paper) {
+				if (pageData.paper) {
 					kw += ` Paper ${pageData.paper}`;
 				}
-				if(pageData.section) {
+				if (pageData.section) {
 					kw += ` Section ${pageData.section}`;
 				}
-				if(pageData.question) {
+				if (pageData.question) {
 					kw += ` Question ${pageData.question}`;
 				}
-				$('#video-keyword').val(kw)
-			}
+				$("#video-keyword").val(kw);
+			};
 
 			const _pullTagFrom = (u, f) => {
 				$.ajax({
@@ -326,7 +326,7 @@
 						pageData.lang = "eng";
 					}
 				}
-				const paper = v.match(/p([^\.]+)\.pdf/);
+				const paper = v.match(/p([^\.\/])\/|\./);
 				if (paper) {
 					const p = paper[1].toUpperCase();
 					$("#q-paper").val(p);
@@ -935,46 +935,53 @@
 					>
 				</div>
 			</div>
-
 			<div class="grid">
 				<div>
-					<input
-						title="Year"
-						id="q-year"
-						type="text"
-						alt="Year"
-						placeholder="Year"
-					/> </div
+					<label
+						>Year
+						<input
+							title="Year"
+							id="q-year"
+							type="text"
+							alt="Year"
+							placeholder="Year" /></label></div
 				><div>
-					<select name="q-lang" id="q-lang">
-						<option id="q-lang-na" value="">N/A</option>
-						<option id="q-lang-chi" value="chi">中文</option>
-						<option id="q-lang-eng" value="eng">Eng</option>
-					</select></div
+					<label
+						>Lang
+						<select name="q-lang" id="q-lang">
+							<option id="q-lang-na" value="">N/A</option>
+							<option id="q-lang-chi" value="chi">中文</option>
+							<option id="q-lang-eng" value="eng">Eng</option>
+						</select></label
+					></div
 				><div>
-					<input
-						title="Paper"
-						id="q-paper"
-						type="text"
-						alt="Paper"
-						placeholder="Paper"
-					/> </div
+					<label
+						>Paper
+						<input
+							title="Paper"
+							id="q-paper"
+							type="text"
+							alt="Paper"
+							placeholder="Paper" /></label></div
 				><div>
-					<input
-						title="Section"
-						id="q-section"
-						type="text"
-						alt="Section"
-						placeholder="Section"
-					/> </div
+					<label
+						>Section
+						<input
+							title="Section"
+							id="q-section"
+							type="text"
+							alt="Section"
+							placeholder="Section" /></label></div
 				><div>
-					<input
-						title="Question#"
-						id="q-number"
-						type="text"
-						alt="Question#"
-						placeholder="Question#"
-					/>
+					<label
+						>Question
+						<input
+							title="Question#"
+							id="q-number"
+							type="text"
+							alt="Question#"
+							placeholder="Question#"
+					/></label>
 				</div>
 			</div>
 			<details id="detail-tags" open>
@@ -1010,9 +1017,16 @@
 			</details>
 
 			<details id="detail-video">
-				<summary role="button" onclick="syncVideoKeyword()" class="secondary">Youtube / Video links</summary>
+				<summary role="button" onclick="syncVideoKeyword()" class="secondary"
+					>Youtube / Video links</summary
+				>
 				<div>
-					<div><input type="text" id="video-keyword" onfocus="navigator.clipboard.writeText(this.value);" /></div>
+					<div
+						><input
+							type="text"
+							id="video-keyword"
+							onfocus="navigator.clipboard.writeText(this.value);"
+					/></div>
 					<div style="display: flex; flex-direction: row">
 						<input
 							style="flex: 5; margin-right: 10px"
