@@ -261,6 +261,7 @@
 			};
 
 			const selectAnswer = (e) => {
+				_busy();
 				$("main").removeClass("mode_question");
 				$("main").addClass("mode_answer");
 
@@ -277,6 +278,7 @@
 				previewData();
 			};
 			const selectQuestion = (e) => {
+				_busy();
 				$("main").removeClass("mode_answer");
 				$("main").addClass("mode_question");
 
@@ -772,6 +774,7 @@
 						function (reason) {
 							// PDF loading error
 							console.error("load error", reason);
+							_free();
 						}
 					);
 				}
@@ -883,8 +886,8 @@
 		</header>
 		<main aria-busy="true" class="">
 			<div class="grid">
-				<div>
-					<lable>
+				<div style="display: flex; flex-direction: row;">
+					<lable style="flex: 8;">
 						Question File
 						<select
 							id="question-selection"
@@ -893,9 +896,11 @@
 						>
 							<option selected disabled value=""> Select question... </option>
 						</select>
-					</lable></div
-				><div>
-					<lable>
+					</lable>
+					<button style="flex: 1;" type="button" onclick="selectQuestion(document.getElementById('question-selection'))">Load</button>
+					</div
+				><div style="display: flex; flex-direction: row;">
+					<lable style="flex: 8;">
 						Answer File
 						<select
 							id="answer-selection"
@@ -905,6 +910,7 @@
 							<option selected disabled value=""> Select answer... </option>
 						</select>
 					</lable>
+					<button style="flex: 1;" type="button" onclick="selectAnswer(document.getElementById('answer-selection'))">Load</button>
 				</div>
 			</div>
 
