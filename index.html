@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html data-theme="dark">
 	<head>
 		<title>Question Editor</title>
 		<script type="text/javascript" src="scripts/f.js"></script>
@@ -89,6 +89,7 @@
 
 				const filePrefix = `y${pageData.year}-l${pageData.lang}-p${pageData.paper}-s${pageData.section}-q${pageData.question}`;
 				const coreFile = `${pageData.subject}/${pageData.lang}/qa/${filePrefix}.json`;
+				const imgFolder = `.internal-ai-image/${pageData.subject}/${pageData.lang}/qa/${filePrefix}/`;
 
 				const z = new JSZip();
 				const folder = z.folder(pageData.subject).folder(pageData.lang);
@@ -109,10 +110,43 @@
 
 				z.file(coreFile, dat);
 
-				z.generateAsync({ type: "blob" }, function updateCallback(metadata) {
-					console.log("zip progression : ", metadata.percent.toFixed(2), "%");
-				}).then((b) => {
-					saveAs(b, `${filePrefix}.zip`);
+				const pp = [];
+
+				$('#preview-question-holder canvas').each((i,e) => {
+					const x = e.getContext('2d');
+					const imgFile = imgFolder+"q"+i+".png";
+
+					const p = new Promise(r => {
+						e.toBlob((b) => {
+							z.file(imgFile, b);
+							r();
+							console.log('resolve', i, imgFile);
+						}, 'image/png');
+					});
+					pp[pp.length] = p;
+				})
+				
+				$('#preview-answer-holder canvas').each((i,e) => {
+					const x = e.getContext('2d');
+					const imgFile = imgFolder+"a"+i+".png";
+
+					const p = new Promise(r => {
+						e.toBlob((b) => {
+							z.file(imgFile, b);
+							r();
+							console.log('resolve', i, imgFile);
+						}, 'image/png');
+					});
+					pp[pp.length] = p;
+				});
+				
+				Promise.all(pp).then(() => {
+
+					z.generateAsync({ type: "blob" }, function updateCallback(metadata) {
+						console.log("zip progression : ", metadata.percent.toFixed(2), "%");
+					}).then((b) => {
+						saveAs(b, `${filePrefix}.zip`);
+					});
 				});
 			};
 
@@ -134,10 +168,14 @@
 				$("#data-summary").text(JSON.stringify(pageData));
 			};
 
+			const sync_md = (ele) =>{
+				pageData.a_md = ele.value;
+				previewData();
+			}
+
 			const drawTags = () => {
 				let h = "";
 				for (let i = 0; i < pageData.tags.length; i++) {
-					console.log(pageData.tags[i]);
 					h += `<span id="tag-${i}"> ${pageData.tags[i]} &nbsp; <button onclick="removeTag(${i})">X</button></span>`;
 				}
 				$("#tags-holder").html(h);
@@ -155,7 +193,29 @@
 				inputBox.value = "";
 				drawTags();
 			};
+			
+			const removeVideo = (pos) => {
+				pageData.videos.splice(pos, 1);
+				drawVideos();
+			};
+			
+			const drawVideos = () => {
+				let h = "";
+				for (let i = 0; i < pageData.videos.length; i++) {
+					const element = pageData.videos[i];
+					h += `<span id="tag-${i}"> ${element} &nbsp; <button onclick="removeVideo(${i})">X</button></span>`;
+				}
+				$("#preview-video-holder").html(h);
+				previewData();
+			};
 
+			const addVideo = (inputBox) => {
+				const v = inputBox.value;
+				pageData.videos[pageData.videos.length] = v;
+				inputBox.value = "";
+				drawVideos();
+			};
+			
 			_busy = () => {
 				$("main").attr("aria-busy");
 			};
@@ -923,12 +983,33 @@
 
 			<details id="detail-video">
 				<summary role="button" class="secondary">Youtube / Video links</summary>
-				<div id="preview-video-holder"> no videos yet </div>
+				<div>
+					
+					<div style="display: flex; flex-direction: row">
+						<input
+							style="flex: 5; margin-right: 10px"
+							title="Video Link"
+							alt="Video Link"
+							placeholder="Video Link"
+							id="video-link"
+						/>
+						<button
+							style="flex: 1"
+							type="button"
+							onclick="addVideo(document.getElementById('video-link'))"
+							>Add</button
+						>
+					</div>
+					<div id="preview-video-holder"> 
+					
+					</div>
+				</div>
+				
 			</details>
 
 			<details id="detail-markdown">
 				<summary role="button" class="secondary">Answer (Markdown)</summary>
-				<textarea id="a-markdown-text"></textarea>
+				<textarea id="a-markdown-text" placeholder="paste your content here" oninput="sync_md(this)"></textarea>
 			</details>
 			<div class="grid">
 				<div>
