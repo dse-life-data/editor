@@ -158,7 +158,7 @@
 					z.generateAsync({ type: "blob" }, function updateCallback(metadata) {
 						console.log("zip progression : ", metadata.percent.toFixed(2), "%");
 					}).then((b) => {
-						saveAs(b, `${filePrefix}.zip`);
+						saveAs(b, `${pageData.subject}-${filePrefix}.zip`);
 					});
 				});
 			};
@@ -236,7 +236,14 @@
 			_free = () => {
 				$("main").removeAttr("aria-busy");
 			};
-
+			function selectFolder() {
+				$('#source-selection').hide();
+				const p = $('#local_source_picker');
+				p.show();
+				p.click();
+				$('#local_source_picker').change();
+				// selectSource(document.getElementById('selectSource'));
+			}
 			const baseData =
 				"https://raw.githubusercontent.com/dse-life-data/pastpaper.x/refs/heads/main/base/data.json";
 			let data = {};
@@ -244,6 +251,12 @@
 
 			const selectSource = (e) => {
 				const v = $(e).val();
+				if(v === 'local') {
+					selectFolder();
+				} else {
+					source = v;
+				}
+				console.log('source changed', source)
 			};
 			const clearSelection = () => {
 				const b = $("#question-selection>option:nth-child(1)").html();
@@ -270,6 +283,7 @@
 			};
 
 			const loadPdfFile = (url) => {
+				console.log("download pdf:", url)
 				module.canopenner.openUrl(url);
 			};
 
@@ -326,7 +340,7 @@
 						pageData.lang = "eng";
 					}
 				}
-				const paper = v.match(/p([^\.\/])\/|\./);
+				const paper = v.match(/\/p([^\.\/]+)/);
 				if (paper) {
 					const p = paper[1].toUpperCase();
 					$("#q-paper").val(p);
@@ -347,6 +361,9 @@
 						`<option value="${key}">${key}</option>`
 					);
 				}
+				$("#source-selection").append(
+					`<option value="local">Local File System</option>`
+				);
 				$("#source-selection>option:nth-child(2)").attr("selected", "selected");
 				for (const key in data.sname) {
 					$("#subject-selection").append(
@@ -881,6 +898,7 @@
 								Select your data source...
 							</option>
 						</select>
+						<input id="local_source_picker" type="text" value="/static/pp/" onchange="selectSource(this)" style="display: none;" />
 					</label>
 				</div>
 				<div>
