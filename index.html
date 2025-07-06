@@ -112,36 +112,35 @@
 
 				const pp = [];
 
-				$('#preview-question-holder canvas').each((i,e) => {
-					const x = e.getContext('2d');
-					const imgFile = imgFolder+"q"+i+".png";
+				$("#preview-question-holder canvas").each((i, e) => {
+					const x = e.getContext("2d");
+					const imgFile = imgFolder + "q" + i + ".png";
 
-					const p = new Promise(r => {
+					const p = new Promise((r) => {
 						e.toBlob((b) => {
 							z.file(imgFile, b);
 							r();
-							console.log('resolve', i, imgFile);
-						}, 'image/png');
-					});
-					pp[pp.length] = p;
-				})
-				
-				$('#preview-answer-holder canvas').each((i,e) => {
-					const x = e.getContext('2d');
-					const imgFile = imgFolder+"a"+i+".png";
-
-					const p = new Promise(r => {
-						e.toBlob((b) => {
-							z.file(imgFile, b);
-							r();
-							console.log('resolve', i, imgFile);
-						}, 'image/png');
+							console.log("resolve", i, imgFile);
+						}, "image/png");
 					});
 					pp[pp.length] = p;
 				});
-				
-				Promise.all(pp).then(() => {
 
+				$("#preview-answer-holder canvas").each((i, e) => {
+					const x = e.getContext("2d");
+					const imgFile = imgFolder + "a" + i + ".png";
+
+					const p = new Promise((r) => {
+						e.toBlob((b) => {
+							z.file(imgFile, b);
+							r();
+							console.log("resolve", i, imgFile);
+						}, "image/png");
+					});
+					pp[pp.length] = p;
+				});
+
+				Promise.all(pp).then(() => {
 					z.generateAsync({ type: "blob" }, function updateCallback(metadata) {
 						console.log("zip progression : ", metadata.percent.toFixed(2), "%");
 					}).then((b) => {
@@ -168,10 +167,10 @@
 				$("#data-summary").text(JSON.stringify(pageData));
 			};
 
-			const sync_md = (ele) =>{
+			const sync_md = (ele) => {
 				pageData.a_md = ele.value;
 				previewData();
-			}
+			};
 
 			const drawTags = () => {
 				let h = "";
@@ -193,12 +192,12 @@
 				inputBox.value = "";
 				drawTags();
 			};
-			
+
 			const removeVideo = (pos) => {
 				pageData.videos.splice(pos, 1);
 				drawVideos();
 			};
-			
+
 			const drawVideos = () => {
 				let h = "";
 				for (let i = 0; i < pageData.videos.length; i++) {
@@ -215,7 +214,7 @@
 				inputBox.value = "";
 				drawVideos();
 			};
-			
+
 			_busy = () => {
 				$("main").attr("aria-busy");
 			};
@@ -886,8 +885,8 @@
 		</header>
 		<main aria-busy="true" class="">
 			<div class="grid">
-				<div style="display: flex; flex-direction: row;">
-					<lable style="flex: 8;">
+				<div style="display: flex; flex-direction: row">
+					<lable style="flex: 8">
 						Question File
 						<select
 							id="question-selection"
@@ -897,10 +896,14 @@
 							<option selected disabled value=""> Select question... </option>
 						</select>
 					</lable>
-					<button style="flex: 1;" type="button" onclick="selectQuestion(document.getElementById('question-selection'))">Load</button>
-					</div
-				><div style="display: flex; flex-direction: row;">
-					<lable style="flex: 8;">
+					<button
+						style="flex: 1"
+						type="button"
+						onclick="selectQuestion(document.getElementById('question-selection'))"
+						>Load</button
+					> </div
+				><div style="display: flex; flex-direction: row">
+					<lable style="flex: 8">
 						Answer File
 						<select
 							id="answer-selection"
@@ -910,7 +913,12 @@
 							<option selected disabled value=""> Select answer... </option>
 						</select>
 					</lable>
-					<button style="flex: 1;" type="button" onclick="selectAnswer(document.getElementById('answer-selection'))">Load</button>
+					<button
+						style="flex: 1"
+						type="button"
+						onclick="selectAnswer(document.getElementById('answer-selection'))"
+						>Load</button
+					>
 				</div>
 			</div>
 
@@ -990,7 +998,6 @@
 			<details id="detail-video">
 				<summary role="button" class="secondary">Youtube / Video links</summary>
 				<div>
-					
 					<div style="display: flex; flex-direction: row">
 						<input
 							style="flex: 5; margin-right: 10px"
@@ -1006,16 +1013,17 @@
 							>Add</button
 						>
 					</div>
-					<div id="preview-video-holder"> 
-					
-					</div>
+					<div id="preview-video-holder"> </div>
 				</div>
-				
 			</details>
 
 			<details id="detail-markdown">
 				<summary role="button" class="secondary">Answer (Markdown)</summary>
-				<textarea id="a-markdown-text" placeholder="paste your content here" oninput="sync_md(this)"></textarea>
+				<textarea
+					id="a-markdown-text"
+					placeholder="paste your content here"
+					oninput="sync_md(this)"
+				></textarea>
 			</details>
 			<div class="grid">
 				<div>
